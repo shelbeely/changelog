@@ -1,0 +1,139 @@
+# Changelog Generator GitHub Action
+#
+# This workflow generates a changelog for new releases using AI.
+# It can be triggered manually or on release creation.
+#
+# Supports multiple AI providers:
+# - Cline CLI
+# - OpenAI API
+# - Anthropic API
+
+name: Generate Changelog
+
+on:
+  # Trigger on new releases
+  release:
+    types: [created]
+  
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 'AI Provider to use'
+        required: true
+        default: 'openai'
+        type: choice
+        options:
+          - openai
+          - anthropic
+          - cline
+          - codex
+
+permissions:
+  contents: write  # Needed to update release notes
+
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for git log
+          fetch-tags: true
+      
+      - name: Get commits since last tag
+        id: commits
+        run: |
+          COMMITS=$(git log $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")..HEAD --oneline --pretty=format:"%h %s" 2>/dev/null || git log --oneline --pretty=format:"%h %s")
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Setup Node.js (for Cline/Codex CLI)
+        if: inputs.provider == 'cline' || inputs.provider == 'codex'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Cline CLI
+        if: inputs.provider == 'cline'
+        run: npm install -g cline
+      
+      - name: Install Codex CLI
+        if: inputs.provider == 'codex'
+        run: npm install -g @openai/codex
+      
+      - name: Generate changelog with Cline
+        if: inputs.provider == 'cline'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          cd ${{ github.workspace }}/cli
+          python3 changelog_cli.py --generate | cline -o text > changelog_output.md
+          cat changelog_output.md
+      
+      - name: Generate changelog with Codex CLI
+        if: inputs.provider == 'codex'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          cd ${{ github.workspace }}
+          PROMPT=$(python3 cli/changelog_cli.py --generate)
+          codex exec "$PROMPT" > changelog_output.md
+          cat changelog_output.md
+      
+      - name: Generate changelog with OpenAI
+        if: inputs.provider == 'openai' || inputs.provider == ''
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Get the prompt
+          PROMPT=$(python3 ${{ github.workspace }}/cli/changelog_cli.py --generate)
+          
+          # Call OpenAI API
+          curl -s https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d "{
+              \"model\": \"gpt-4o\",
+              \"messages\": [{\"role\": \"user\", \"content\": $(echo "$PROMPT" | jq -Rs .)}]
+            }" | jq -r '.choices[0].message.content' > changelog_output.md
+          
+          cat changelog_output.md
+      
+      - name: Generate changelog with Anthropic
+        if: inputs.provider == 'anthropic'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Get the prompt
+          PROMPT=$(python3 ${{ github.workspace }}/cli/changelog_cli.py --generate)
+          
+          # Call Anthropic API
+          curl -s https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "{
+              \"model\": \"claude-sonnet-4-20250514\",
+              \"max_tokens\": 4096,
+              \"messages\": [{\"role\": \"user\", \"content\": $(echo "$PROMPT" | jq -Rs .)}]
+            }" | jq -r '.content[0].text' > changelog_output.md
+          
+          cat changelog_output.md
+      
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: changelog_output.md
+      
+      - name: Update release body (on release trigger)
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CHANGELOG=$(cat changelog_output.md)
+          gh release edit ${{ github.event.release.tag_name }} --notes "$CHANGELOG"
