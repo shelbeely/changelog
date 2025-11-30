@@ -17,8 +17,14 @@ These tools are designed to integrate with CLI-based AI agents like:
 # Get commits since last release
 python changelog_cli.py --commits
 
+# Get all commits from entire git history (retroactive)
+python changelog_cli.py --commits --full-history
+
 # Generate full prompt for AI agents
 python changelog_cli.py --generate
+
+# Generate full prompt for entire git history
+python changelog_cli.py --generate --full-history
 
 # Print only the system prompt
 python changelog_cli.py --prompt-only
@@ -33,8 +39,14 @@ chmod +x changelog.sh
 # Get commits since last release
 ./changelog.sh --commits
 
+# Get all commits from entire git history (retroactive)
+./changelog.sh --commits-all
+
 # Generate full prompt for AI agents
 ./changelog.sh --generate
+
+# Generate full prompt for entire git history
+./changelog.sh --generate-all
 
 # Print only the system prompt
 ./changelog.sh --prompt-only
@@ -126,14 +138,27 @@ your-ai-cli "$(python changelog_cli.py --generate)"
 ## How It Works
 
 1. **`--commits`**: Uses `git log` to fetch all commits since the last tagged release
-2. **`--generate`**: Creates a complete prompt including:
+2. **`--commits --full-history`** (or `--commits-all` for shell): Gets all commits from the entire git history
+3. **`--generate`**: Creates a complete prompt including:
    - System instructions for changelog formatting
    - The list of commits to analyze
    - Request to generate the changelog
-3. The AI agent processes the prompt and outputs a formatted markdown changelog
+4. The AI agent processes the prompt and outputs a formatted markdown changelog
+
+## Retroactive Changelog Generation
+
+To generate a changelog for your entire git history (useful for projects without prior changelogs):
+
+```bash
+# Python CLI
+python changelog_cli.py --generate --full-history | cline -o text > CHANGELOG.md
+
+# Shell script
+./changelog.sh --generate-all | cline -o text > CHANGELOG.md
+```
 
 ## Requirements
 
-- Git repository with at least one tag
+- Git repository (tags required only for release-based changelog)
 - Python 3.6+ (for Python version) or Bash (for shell version)
 - No external dependencies required!

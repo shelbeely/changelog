@@ -14,18 +14,22 @@ pip install -r requirements.txt
 from changelog_agent import create_changelog_agent, run_changelog_agent
 from agents import Runner
 
-# Option 1: Quick synchronous run
+# Option 1: Quick synchronous run (commits since last release)
 changelog = run_changelog_agent()
 print(changelog)
 
-# Option 2: Async run
+# Option 2: Generate changelog for entire git history (retroactive)
+changelog = run_changelog_agent(full_history=True)
+print(changelog)
+
+# Option 3: Async run
 import asyncio
 from changelog_agent import run_changelog_agent_async
 
 changelog = asyncio.run(run_changelog_agent_async())
 print(changelog)
 
-# Option 3: Create agent for more control
+# Option 4: Create agent for more control
 agent = create_changelog_agent(model="gpt-4o")
 result = Runner.run_sync(agent, "Generate a changelog for this repository")
 print(result.final_output)
@@ -39,6 +43,18 @@ changelog = run_changelog_agent(model="gpt-4-turbo")
 
 # Or when creating the agent
 agent = create_changelog_agent(model="gpt-4o-mini")
+```
+
+## Retroactive Changelog Generation
+
+To generate a changelog for your entire git history:
+
+```python
+# Synchronous
+changelog = run_changelog_agent(full_history=True)
+
+# Asynchronous
+changelog = await run_changelog_agent_async(full_history=True)
 ```
 
 ## Command Line Usage

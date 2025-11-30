@@ -44,6 +44,14 @@ get_new_commits() {
     fi
 }
 
+get_all_commits() {
+    git log --oneline --pretty=format:"%h %s" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "Error: Could not get commits. Make sure you're in a git repository." >&2
+        return 1
+    fi
+}
+
 show_help() {
     cat << EOF
 Changelog Generator
@@ -51,17 +59,25 @@ Changelog Generator
 Usage: $(basename "$0") [OPTION]
 
 Options:
-  --commits       Print the list of commits since the last release
-  --generate      Generate the full prompt for changelog generation
-  --prompt-only   Print only the system prompt without commits
-  --help          Show this help message
+  --commits            Print the list of commits since the last release
+  --commits-all        Print all commits from entire git history
+  --generate           Generate the full prompt for changelog generation
+  --generate-all       Generate the full prompt for entire git history
+  --prompt-only        Print only the system prompt without commits
+  --help               Show this help message
 
 Examples:
   # Get commits since last release
   $(basename "$0") --commits
   
+  # Get all commits from entire git history
+  $(basename "$0") --commits-all
+  
   # Generate full prompt for AI agents
   $(basename "$0") --generate
+  
+  # Generate full prompt for entire git history
+  $(basename "$0") --generate-all
   
   # Pipe to an AI CLI tool
   $(basename "$0") --generate | codex
@@ -74,8 +90,24 @@ case "$1" in
     --commits)
         get_new_commits
         ;;
+    --commits-all)
+        get_all_commits
+        ;;
     --generate)
         commits=$(get_new_commits)
+        if [ $? -ne 0 ]; then
+            exit 1
+        fi
+        echo "$CHANGELOG_PROMPT"
+        echo ""
+        echo "## Commits to analyze"
+        echo ""
+        echo "$commits"
+        echo ""
+        echo "Please generate a changelog based on these commits."
+        ;;
+    --generate-all)
+        commits=$(get_all_commits)
         if [ $? -ne 0 ]; then
             exit 1
         fi

@@ -167,6 +167,38 @@ workflow_dispatch:
 All implementations share the same core functionality:
 
 1. **get_new_commits** - Fetches commits since the last git tag
-2. **create_changelog** - Generates formatted markdown changelog
+2. **get_all_commits** - Fetches all commits from entire git history (for retroactive changelog generation)
+3. **create_changelog** - Generates formatted markdown changelog
 
 The agent analyzes commits, categorizes them (features, fixes, etc.), and produces a clean changelog with emojis for important changes.
+
+---
+
+## Retroactive Changelog Generation
+
+All implementations support generating changelogs for the entire git history, not just since the last release. This is useful for:
+
+- Projects without prior changelogs
+- Creating a comprehensive project history
+- Onboarding new contributors
+
+### CLI Tools
+
+```bash
+# Python CLI
+python changelog_cli.py --generate --full-history
+
+# Shell script
+./changelog.sh --generate-all
+```
+
+### LangChain / OpenAI Agents
+
+```python
+# Generate changelog for entire git history
+changelog = run_changelog_agent(llm, full_history=True)
+```
+
+### GitHub Actions
+
+When triggering the workflow manually, enable the "Generate changelog for entire git history (retroactive)" option.

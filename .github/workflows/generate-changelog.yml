@@ -28,6 +28,11 @@ on:
           - anthropic
           - cline
           - codex
+      full_history:
+        description: 'Generate changelog for entire git history (retroactive)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write  # Needed to update release notes
@@ -46,7 +51,13 @@ jobs:
       - name: Get commits since last tag
         id: commits
         run: |
-          COMMITS=$(git log $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")..HEAD --oneline --pretty=format:"%h %s" 2>/dev/null || git log --oneline --pretty=format:"%h %s")
+          if [ "${{ inputs.full_history }}" == "true" ]; then
+            # Get all commits from entire git history
+            COMMITS=$(git log --oneline --pretty=format:"%h %s")
+          else
+            # Get commits since last tag
+            COMMITS=$(git log $(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")..HEAD --oneline --pretty=format:"%h %s" 2>/dev/null || git log --oneline --pretty=format:"%h %s")
+          fi
           echo "commits<<EOF" >> $GITHUB_OUTPUT
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -71,7 +82,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           cd ${{ github.workspace }}/cli
-          python3 changelog_cli.py --generate | cline -o text > changelog_output.md
+          FULL_HISTORY_FLAG=""
+          if [ "${{ inputs.full_history }}" == "true" ]; then
+            FULL_HISTORY_FLAG="--full-history"
+          fi
+          python3 changelog_cli.py --generate $FULL_HISTORY_FLAG | cline -o text > changelog_output.md
           cat changelog_output.md
       
       - name: Generate changelog with Codex CLI
@@ -80,7 +95,11 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           cd ${{ github.workspace }}
-          PROMPT=$(python3 cli/changelog_cli.py --generate)
+          FULL_HISTORY_FLAG=""
+          if [ "${{ inputs.full_history }}" == "true" ]; then
+            FULL_HISTORY_FLAG="--full-history"
+          fi
+          PROMPT=$(python3 cli/changelog_cli.py --generate $FULL_HISTORY_FLAG)
           codex exec "$PROMPT" > changelog_output.md
           cat changelog_output.md
       
@@ -90,7 +109,11 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           # Get the prompt
-          PROMPT=$(python3 ${{ github.workspace }}/cli/changelog_cli.py --generate)
+          FULL_HISTORY_FLAG=""
+          if [ "${{ inputs.full_history }}" == "true" ]; then
+            FULL_HISTORY_FLAG="--full-history"
+          fi
+          PROMPT=$(python3 ${{ github.workspace }}/cli/changelog_cli.py --generate $FULL_HISTORY_FLAG)
           
           # Call OpenAI API
           curl -s https://api.openai.com/v1/chat/completions \
@@ -109,7 +132,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # Get the prompt
-          PROMPT=$(python3 ${{ github.workspace }}/cli/changelog_cli.py --generate)
+          FULL_HISTORY_FLAG=""
+          if [ "${{ inputs.full_history }}" == "true" ]; then
+            FULL_HISTORY_FLAG="--full-history"
+          fi
+          PROMPT=$(python3 ${{ github.workspace }}/cli/changelog_cli.py --generate $FULL_HISTORY_FLAG)
           
           # Call Anthropic API
           curl -s https://api.anthropic.com/v1/messages \

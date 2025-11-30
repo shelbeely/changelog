@@ -17,8 +17,9 @@ SYSTEM_PROMPT = """You are a helpful assistant that generates changelogs for pro
 
 ## Guidance
 
-- Use the get_new_commits tool to get the list of commits if not provided.
-- Use the create_changelog tool to generate a changelog for the new commits.
+- Use the get_new_commits tool to get the list of commits since the last release if not provided.
+- Use the get_all_commits tool to get all commits from the entire git history for retroactive changelog generation.
+- Use the create_changelog tool to generate a changelog for the commits.
 - Focus on the new features and major fixes.
 - Group and summarize other minor changes into "Miscellaneous" or "Other".
 - Add relevant and catchy emojis but ONLY to important changes.
@@ -31,6 +32,23 @@ def get_new_commits() -> str:
     try:
         result = subprocess.run(
             'git log $(git describe --tags --abbrev=0)..HEAD --oneline --pretty=format:"%h %s"',
+            capture_output=True,
+            text=True,
+            shell=True
+        )
+        if result.returncode == 0:
+            return result.stdout
+        return f"Error getting commits: {result.stderr}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+@tool
+def get_all_commits() -> str:
+    """Get all commits from the entire git history for retroactive changelog generation."""
+    try:
+        result = subprocess.run(
+            'git log --oneline --pretty=format:"%h %s"',
             capture_output=True,
             text=True,
             shell=True
@@ -86,7 +104,7 @@ def create_changelog_agent(llm):
         agent = create_changelog_agent(llm)
         result = agent.invoke({"input": "Generate a changelog for this repository"})
     """
-    tools = [get_new_commits, create_changelog]
+    tools = [get_new_commits, get_all_commits, create_changelog]
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
@@ -99,12 +117,14 @@ def create_changelog_agent(llm):
     return AgentExecutor(agent=agent, tools=tools, verbose=True)
 
 
-def run_changelog_agent(llm, commits: Optional[str] = None):
+def run_changelog_agent(llm, commits: Optional[str] = None, full_history: bool = False):
     """Run the changelog agent to generate a changelog.
     
     Args:
         llm: A LangChain chat model
         commits: Optional pre-fetched commits. If not provided, the agent will fetch them.
+        full_history: If True, generate changelog for the entire git history.
+                     If False (default), only include commits since the last release.
         
     Returns:
         str: The generated changelog markdown
@@ -113,6 +133,8 @@ def run_changelog_agent(llm, commits: Optional[str] = None):
     
     if commits:
         input_text = f"Generate a changelog for these commits:\n\n{commits}"
+    elif full_history:
+        input_text = "Get all commits from the entire git history and generate a comprehensive changelog for this repository"
     else:
         input_text = "Get the new commits and generate a changelog for this repository"
     
