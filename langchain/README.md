@@ -24,11 +24,15 @@ from changelog_agent import create_changelog_agent, run_changelog_agent
 # Create an LLM instance
 llm = ChatOpenAI(model="gpt-4")
 
-# Option 1: Quick run
+# Option 1: Quick run (commits since last release)
 changelog = run_changelog_agent(llm)
 print(changelog)
 
-# Option 2: Create agent for more control
+# Option 2: Generate changelog for entire git history (retroactive)
+changelog = run_changelog_agent(llm, full_history=True)
+print(changelog)
+
+# Option 3: Create agent for more control
 agent = create_changelog_agent(llm)
 result = agent.invoke({"input": "Generate a changelog for this repository"})
 print(result["output"])
@@ -46,6 +50,15 @@ changelog = run_changelog_agent(llm)
 from langchain_google_genai import ChatGoogleGenerativeAI
 llm = ChatGoogleGenerativeAI(model="gemini-pro")
 changelog = run_changelog_agent(llm)
+```
+
+## Retroactive Changelog Generation
+
+To generate a changelog for your entire git history:
+
+```python
+# Generate a comprehensive changelog from all commits
+changelog = run_changelog_agent(llm, full_history=True)
 ```
 
 ## Command Line Usage

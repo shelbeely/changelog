@@ -43,11 +43,23 @@ CHANGELOG_PROMPT = """You are a helpful assistant that generates changelogs for 
 """
 
 
-def get_new_commits() -> str:
-    """Get the list of new commits since the last release."""
+def get_new_commits(full_history: bool = False) -> str:
+    """Get the list of commits.
+    
+    Args:
+        full_history: If True, get all commits from entire git history.
+                     If False, get only commits since the last release tag.
+    """
     try:
+        if full_history:
+            # Get all commits from the entire git history
+            cmd = 'git log --oneline --pretty=format:"%h %s"'
+        else:
+            # Get commits since the last release tag
+            cmd = 'git log $(git describe --tags --abbrev=0)..HEAD --oneline --pretty=format:"%h %s"'
+        
         result = subprocess.run(
-            'git log $(git describe --tags --abbrev=0)..HEAD --oneline --pretty=format:"%h %s"',
+            cmd,
             capture_output=True,
             text=True,
             shell=True
@@ -79,8 +91,14 @@ Examples:
     # Get commits since last release
     python changelog_cli.py --commits
     
+    # Get all commits from entire git history
+    python changelog_cli.py --commits --full-history
+    
     # Generate full prompt for AI agents
     python changelog_cli.py --generate
+    
+    # Generate full prompt for entire git history
+    python changelog_cli.py --generate --full-history
     
     # Pipe to an AI CLI tool
     python changelog_cli.py --generate | codex
@@ -106,6 +124,12 @@ Examples:
         help="Print only the system prompt without commits"
     )
     
+    parser.add_argument(
+        "--full-history",
+        action="store_true",
+        help="Include all commits from the entire git history, not just since the last release"
+    )
+    
     args = parser.parse_args()
     
     if args.prompt_only:
@@ -113,12 +137,12 @@ Examples:
         return 0
     
     if args.commits:
-        commits = get_new_commits()
+        commits = get_new_commits(full_history=args.full_history)
         print(commits)
         return 0
         
     if args.generate:
-        commits = get_new_commits()
+        commits = get_new_commits(full_history=args.full_history)
         if commits.startswith("Error"):
             print(commits, file=sys.stderr)
             return 1
